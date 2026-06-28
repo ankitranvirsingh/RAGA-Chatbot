@@ -1,21 +1,21 @@
 # render.yaml
 # One-click deploy to Render.com (free tier)
-# Docs: https://render.com/docs/blueprint-spec
 
 services:
   # ── FastAPI API ───────────────────────────────────────────────────────────────
   - type: web
     name: rag-chatbot-api
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: free          # free tier (512 MB RAM, shared CPU, spins down after 15 min)
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    plan: free
     envVars:
       - key: GROQ_API_KEY
-        sync: false     # Set manually in Render dashboard
+        sync: false
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD
-        sync: false     # Set manually
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: REDIS_URL
@@ -24,17 +24,17 @@ services:
           name: rag-redis
           property: connectionString
       - key: CHROMA_PERSIST_DIR
-        value: /app/data/chromadb
+        value: ./data/chromadb
       - key: UPLOAD_DIR
-        value: /app/data/uploads
+        value: ./data/uploads
       - key: SQLITE_PATH
-        value: /app/data/metadata.db
+        value: ./data/metadata.db
       - key: ALLOWED_ORIGINS
         value: "*"
-    disk:
-      name: rag-data
-      mountPath: /app/data
-      sizeGB: 1         # 1 GB persistent disk (free on Render)
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
 
   # ── Streamlit Chat UI ─────────────────────────────────────────────────────────
   - type: web
@@ -45,7 +45,7 @@ services:
     plan: free
     envVars:
       - key: API_URL
-        value: https://rag-chatbot-api.onrender.com   # ← update with your actual API URL
+        value: https://rag-chatbot-api.onrender.com
 
   # ── Streamlit Admin UI ────────────────────────────────────────────────────────
   - type: web
@@ -56,10 +56,10 @@ services:
     plan: free
     envVars:
       - key: API_URL
-        value: https://rag-chatbot-api.onrender.com   # ← update with your actual API URL
+        value: https://rag-chatbot-api.onrender.com
 
   # ── Redis ─────────────────────────────────────────────────────────────────────
   - type: redis
     name: rag-redis
-    plan: free          # 25 MB RAM, no persistence — use Upstash for more
-    ipAllowList: []     # only accessible by other Render services
+    plan: free
+    ipAllowList: []

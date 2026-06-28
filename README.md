@@ -531,16 +531,21 @@ For Excel/CSV files with columns like `reports_to`, `manager`, `line manager`, `
 1. Push to GitHub
 2. Go to **render.com → New → Blueprint** → connect your repo
 3. Render reads `render.yaml` automatically and creates:
-   - FastAPI API service (with 1 GB persistent disk)
+   - FastAPI API service (Python runtime)
    - Streamlit Chat UI
    - Streamlit Admin UI
-   - Redis instance
-4. Set environment variables in the Render dashboard:
+   - Redis instance (25 MB free)
+4. Set these environment variables manually in the Render dashboard
+   for the **rag-chatbot-api** service:
    - `GROQ_API_KEY` → your Groq key
    - `ADMIN_PASSWORD` → your secure password
 5. Deploy → get public `*.onrender.com` URLs
 
-> ⚠️ Free tier: services sleep after 15 min inactivity. First request after sleep = ~30s cold start.
+> ⚠️ Free tier limitations:
+> - Services sleep after 15 min inactivity — first request after sleep takes ~30s to wake up
+> - No persistent disk — uploaded files and vectors reset when the service restarts
+> - For permanent storage, upgrade to Render's $7/month paid plan which includes disk support
+> - **Recommended for:** demos, portfolios, and sharing with others
 
 ---
 
