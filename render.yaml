@@ -1,0 +1,65 @@
+# render.yaml
+# One-click deploy to Render.com (free tier)
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── FastAPI API ───────────────────────────────────────────────────────────────
+  - type: web
+    name: rag-chatbot-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free          # free tier (512 MB RAM, shared CPU, spins down after 15 min)
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false     # Set manually in Render dashboard
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false     # Set manually
+      - key: SECRET_KEY
+        generateValue: true
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: rag-redis
+          property: connectionString
+      - key: CHROMA_PERSIST_DIR
+        value: /app/data/chromadb
+      - key: UPLOAD_DIR
+        value: /app/data/uploads
+      - key: SQLITE_PATH
+        value: /app/data/metadata.db
+      - key: ALLOWED_ORIGINS
+        value: "*"
+    disk:
+      name: rag-data
+      mountPath: /app/data
+      sizeGB: 1         # 1 GB persistent disk (free on Render)
+
+  # ── Streamlit Chat UI ─────────────────────────────────────────────────────────
+  - type: web
+    name: rag-chatbot-ui
+    runtime: python
+    buildCommand: pip install streamlit requests
+    startCommand: streamlit run frontend/user_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    plan: free
+    envVars:
+      - key: API_URL
+        value: https://rag-chatbot-api.onrender.com   # ← update with your actual API URL
+
+  # ── Streamlit Admin UI ────────────────────────────────────────────────────────
+  - type: web
+    name: rag-chatbot-admin
+    runtime: python
+    buildCommand: pip install streamlit requests
+    startCommand: streamlit run frontend/admin_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    plan: free
+    envVars:
+      - key: API_URL
+        value: https://rag-chatbot-api.onrender.com   # ← update with your actual API URL
+
+  # ── Redis ─────────────────────────────────────────────────────────────────────
+  - type: redis
+    name: rag-redis
+    plan: free          # 25 MB RAM, no persistence — use Upstash for more
+    ipAllowList: []     # only accessible by other Render services

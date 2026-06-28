@@ -1,0 +1,85 @@
+version: "3.9"
+
+services:
+
+  # ── Redis (chat history) ──────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: rag_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ───────────────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: rag_api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CHROMA_PERSIST_DIR=/app/data/chromadb
+      - UPLOAD_DIR=/app/data/uploads
+      - SQLITE_PATH=/app/data/metadata.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - app_data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # ── Streamlit Chat UI ─────────────────────────────────────────────────────────
+  user_ui:
+    build: .
+    container_name: rag_user_ui
+    restart: unless-stopped
+    command: >
+      streamlit run frontend/user_app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+      --server.headless true
+      --browser.gatherUsageStats false
+    environment:
+      - API_URL=http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+
+  # ── Streamlit Admin UI ────────────────────────────────────────────────────────
+  admin_ui:
+    build: .
+    container_name: rag_admin_ui
+    restart: unless-stopped
+    command: >
+      streamlit run frontend/admin_app.py
+      --server.port 8502
+      --server.address 0.0.0.0
+      --server.headless true
+      --browser.gatherUsageStats false
+    environment:
+      - API_URL=http://api:8000
+    ports:
+      - "8502:8502"
+    depends_on:
+      - api
+
+volumes:
+  redis_data:
+  app_data:
